@@ -20,7 +20,7 @@ namespace referendum{
     using std::string;
     using std::vector;
 
-    class [[eosio::contract("referendum_contract")]] referendum_contract : public eosio::contract{
+    class [[eosio::contract("referendum")]] referendum_contract : public eosio::contract{
 
         public:
             using contract::contract;
@@ -34,10 +34,13 @@ namespace referendum{
         void makeproposal(name creator, const string& proposal_name, const string& content);
 
         [[eosio::action]]
-        void transfer(uint64_t sender, uint64_t receiver);
+        void transfer(name sender, name receiver);
 
         [[eosio::action]]
         void vote(name voter, uint64_t id, bool is_agree);
+
+        [[eosio::action]]
+        void refund(name voter);
 
         private:
             struct account {
@@ -56,7 +59,7 @@ namespace referendum{
                 std::string   memo;
             };
 
-            struct [[eosio::table]] proposal{
+            struct [[eosio::table("proposals"), eosio::contract("referendum")]] proposal{
                 uint64_t id;
                 name creator;
                 string proposal_name;
@@ -66,24 +69,29 @@ namespace referendum{
 
                 uint64_t primary_key() const { return creator.value; }
                 uint64_t by_id() const { return static_cast<uint64_t>(id); }
+
+                EOSLIB_SERIALIZE(proposal, (id)(creator)(proposal_name)(content)(yes)(no))
             };
 
             typedef eosio::multi_index< name("proposals"), proposal,
                     indexed_by< name("idx"), const_mem_fun<proposal, uint64_t, &proposal::by_id>  >
             > proposals;
 
-            //typedef eosio::multi_index<name("proposals"), proposal> proposals;
+        //typedef eosio::multi_index<name("proposals"), proposal> proposals;
 
-            struct [[eosio::table]] voter{
+            struct [[eosio::table("voters"), eosio::contract("referendum")]] voter_struct{
                 name voter;
+                asset tokens;
                 int64_t amount;
-                vector<int64_t> agreed_proposal_ids;
-                vector<int64_t> disagreed_proposal_ids;
+                vector<uint64_t> agreed_proposal_ids;
+                vector<uint64_t> disagreed_proposal_ids;
 
                 uint64_t primary_key() const { return voter.value; }
+
+                EOSLIB_SERIALIZE(voter_struct, (voter)(tokens)(amount)(agreed_proposal_ids)(disagreed_proposal_ids))
             };
 
-            typedef eosio::multi_index<name("voters"), voter> voters;
+            typedef eosio::multi_index<name("voters"), voter_struct> voters;
 
             struct counter{
                 uint64_t global_id = 0;
@@ -94,6 +102,5 @@ namespace referendum{
             typedef eosio::singleton< name("counter"), counter > counter_singleton;
 
             counter_singleton _counter;
-
     };
 } //referendum
