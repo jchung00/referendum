@@ -9,10 +9,18 @@ namespace referendum{
 
         proposals _proposals(_self, _self.value);
 
-        auto proposal_counter = _counter.get();
+        counter_singleton _counter(_self, _self.value);
+
+        if(_counter.begin() == _counter.end()){
+            _counter.emplace(get_self(), [&](auto& c){
+               c.global_id = 0;
+            });
+        }
+
+        auto count = _counter.find(0);
 
         _proposals.emplace(creator, [&](auto& proposal){
-            proposal.id = proposal_counter.global_id;
+            proposal.id = (*count).global_id;
             proposal.creator = creator;
             proposal.proposal_name = proposal_name;
             proposal.content = content;
@@ -20,8 +28,9 @@ namespace referendum{
             proposal.no = 0;
         });
 
-        proposal_counter.global_id++;
-        _counter.set(proposal_counter, _self);
+        _counter.modify(_counter.begin(), get_self(), [&](auto& c){
+           c.global_id++;
+        });
     }
 
     void referendum_contract::transfer(name sender, name receiver){
@@ -161,4 +170,19 @@ namespace referendum{
     }
 } //referendum
 
-EOSIO_DISPATCH(referendum::referendum_contract, (makeproposal)(transfer)(vote)(refund))
+#define EOSIO_DISPATCH_CUSTOM(TYPE, MEMBERS) \
+  extern "C" { \
+  void apply(uint64_t receiver, uint64_t code, uint64_t action) { \
+    auto self = receiver; \
+    bool self_action = code == self && action != "transfer"_n.value; \
+    bool transfer = action == "transfer"_n.value; \
+    if (self_action || transfer) { \
+      switch (action) { \
+          EOSIO_DISPATCH_HELPER(TYPE, MEMBERS) \
+      }    \
+          /* does not allow destructor of this contract to run: eosio_exit(0); */ \
+    } \
+  } \
+}
+
+EOSIO_DISPATCH_CUSTOM(referendum::referendum_contract, (makeproposal)(transfer)(vote)(refund))

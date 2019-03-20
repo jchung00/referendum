@@ -26,11 +26,9 @@ namespace referendum{
             using contract::contract;
 
             referendum_contract( name s, name code, datastream<const char*> ds )
-                    :contract(s,code,ds),
-                     _counter(_self, _self.value){}
-            //explicit referendum_contract(uint64_t get_self());
+                    :contract(s,code,ds){}
 
-            [[eosio::action]]
+        [[eosio::action]]
         void makeproposal(name creator, const string& proposal_name, const string& content);
 
         [[eosio::action]]
@@ -94,13 +92,14 @@ namespace referendum{
             typedef eosio::multi_index<name("voters"), voter_struct> voters;
 
             struct counter{
-                uint64_t global_id = 0;
+                uint64_t global_id;
+
+                uint64_t primary_key() const { return 0; }
 
                 EOSLIB_SERIALIZE(counter, (global_id));
             };
 
-            typedef eosio::singleton< name("counter"), counter > counter_singleton;
+            typedef eosio::multi_index< name("counter"), counter > counter_singleton;
 
-            counter_singleton _counter;
     };
 } //referendum
